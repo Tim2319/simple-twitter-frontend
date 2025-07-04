@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../contexts/AuthContext'
 
 const Login = () => {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -17,9 +19,11 @@ const Login = () => {
         password,
       })
 
-      const { token } = response.data
+      const { token, user } = response.data
+
       localStorage.setItem('token', token)
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      login(user)
 
       navigate('/') // 登入成功導向首頁
     } catch (err) {

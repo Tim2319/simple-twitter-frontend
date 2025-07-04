@@ -1,26 +1,27 @@
 import SideBar from './SideBar'
 import RightAside from './RightAside'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import { useAuth } from '../contexts/AuthContext'
 
 
 const Layout = ({ children }) => {
-  const token = localStorage.getItem('token')
   const navigate = useNavigate()
+  const { currentUser, logout } = useAuth()
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    delete axios.defaults.headers.common['Authorization']
-    navigate('/login')
-  }
+  logout()
+  navigate('/login')
+}
+
+  console.log('目前登入使用者：', currentUser?.name)
 
   return (
     <>
       <header style={{
         display: 'flex', justifyContent: 'flex-end', padding: '1rem', borderBottom: '1px solid #ccc'
       }}>
-        {token ? (
-          <button onClick={handleLogout}>登出</button>
+        {currentUser  ? (
+          <button onClick={handleLogout}>登出 ({currentUser.name})</button>
         ) : (
           <button onClick={() => navigate('/login')}>登入</button>
         )}

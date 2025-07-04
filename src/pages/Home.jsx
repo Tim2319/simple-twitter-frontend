@@ -13,7 +13,10 @@ const Home = () => {
     const fetchPosts = async () => {
       try {
         const response = await axios.get('http://localhost:3000/posts')
-        setPosts(response.data)
+
+        console.log('後端回傳資料', response.data)
+
+        setPosts(response.data.posts || [])
       } catch (err) {
         console.error('❌ 無法載入貼文', err)
       }
@@ -27,10 +30,10 @@ const Home = () => {
     if (!description.trim()) return
 
     try {
-      await axios.post('http://localhost:3000/posts', { description })
+      await axios.post('http://localhost:3000/posts', { content: description })
       setDescription('')
       const response = await axios.get('http://localhost:3000/posts')
-      setPosts(response.data)
+      setPosts(response.data.posts || [])
     } catch (err) {
       console.error('❌ 發文失敗', err)
       setError('請重新登入後再發文')
@@ -56,12 +59,17 @@ const Home = () => {
 
       <hr />
       <h3>最新貼文</h3>
-      {posts.map((post) => (
+
+    {posts.length === 0 ? (
+    <p>目前沒有貼文。</p>
+  ) : (
+      posts.map((post) => (
         <div key={post.id}>
-          <strong>@{post.User?.account}</strong>
-          <p>{post.description}</p>
+          <strong>@{post.user?.account}</strong>
+          <p>{post.content}</p>
         </div>
-      ))}
+      ))
+    )}
     </Layout>
   )
 }
