@@ -7,7 +7,7 @@ const SideBar = () => {
       <ul style={{ listStyle: 'none', padding: 0 }}>
         <li><Link to="/">🏠 首頁</Link></li>
         <li><Link to="/profile">👤 個人資料</Link></li>
-        <li><Link to="/messages">✉️ 私訊</Link></li>
+        <li><Link to="/chat">✉️ 私訊</Link></li>
       </ul>
     </nav>
   )

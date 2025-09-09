@@ -22,7 +22,7 @@ const Login = () => {
       const { token, user } = response.data
 
       localStorage.setItem('token', token)
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`      
       login(user)
 
       navigate('/') // 登入成功導向首頁
