@@ -1,9 +1,13 @@
 import { useParams } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { apiHelper } from '../utils/helpers'
+import { getSocket } from '../utils/socket'
+
+const PUBLIC_ROOM_ID = 1
 
 const ChatRoom = () => {
   const { roomId } = useParams()
+  const numericRoomId = Number(roomId)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -13,13 +17,13 @@ const ChatRoom = () => {
 
 
   useEffect(() => {
-    if (!roomId) return
+    if (!numericRoomId) return
     let ignore = false
     const fetchMessages = async () => {
       try {
         setLoading(true)
         setError('')
-        const { data } = await apiHelper.get(`/rooms/${roomId}`)
+        const { data } = await apiHelper.get(`/rooms/${numericRoomId}`)
         const msgs = Array.isArray(data.messages) ? data.messages : []
         if (!ignore) setMessages(msgs)
       } catch (err) {
@@ -35,24 +39,79 @@ const ChatRoom = () => {
 
     fetchMessages()
     return () => { ignore = true }
-  }, [roomId])
+  }, [numericRoomId])
+
+  useEffect(() => {
+    if (!numericRoomId) return
+    const socket = getSocket()
+    if (!socket.connected) socket.connect()
+
+    // 先建立 session（可選）
+    socket.emit('session', [`${numericRoomId}`])
+
+    // 正式加入房間
+    socket.emit('join', { username: 'me', roomId: numericRoomId })
+
+    const onPublicMsg = (payload) => {
+      // payload 通常是 generateMessage() 結果，可能沒有 roomId，公開房直接收
+      if (numericRoomId === PUBLIC_ROOM_ID) {
+        setMessages(prev => [...prev, payload])
+      }
+    }
+    const onPrivateMsg = (payload, maybeRoomId) => {
+      // 你的後端 private 事件有時會帶第二個 roomId 參數
+      const rId = payload?.roomId ?? maybeRoomId
+      if (String(rId) === String(numericRoomId)) {
+        setMessages(prev => [...prev, payload])
+      }
+    }
+    const onSystemMsg = (payload) => {
+      if (numericRoomId === PUBLIC_ROOM_ID) {
+        setMessages(prev => [...prev, payload]) // 系統訊息也顯示
+      }
+    }
+    const onUsersCount = (payload) => {
+      // 可選：把在線人數顯示在標題（這裡只示範印 log）
+      console.log('users count', payload.userCount, payload.users)
+    }
+
+    socket.on('chat message', onPublicMsg)
+    socket.on('private chat message', onPrivateMsg)
+    socket.on('message', onSystemMsg)
+    socket.on('users count', onUsersCount)
+
+    return () => {
+      // 離開房間
+      try { socket.emit('leave', /* userId 可不傳 */ null, numericRoomId) } catch {}
+      socket.off('chat message', onPublicMsg)
+      socket.off('private chat message', onPrivateMsg)
+      socket.off('message', onSystemMsg)
+      socket.off('users count', onUsersCount)
+    }
+  }, [numericRoomId])
 
   const handleSend = async () => {
     const text = input.trim()
-    if(!text || !roomId || sending) return
+    if(!text || !numericRoomId || sending) return
 
     const tempId = `temp-${Date.now()}`
-    const optimistic = { id: tempId, user: 'me', message: text }
+    const optimistic = { id: tempId, user: 'me', message: text, roomId: numericRoomId }
     setMessages(prev => [...prev, optimistic])
     setInput('')
     setSending(true)
 
-  try {
-      const { data } = await apiHelper.post(`/rooms/${roomId}/messages`, { message: text })
-      // 若後端回新訊息物件（建議如此），用真實資料取代暫存；否則就保留樂觀那筆
-      if (data && data.id) {
-        setMessages(prev => prev.map(m => (m.id === tempId ? data : m)))
+    const socket = getSocket()
+    try {
+      if (numericRoomId === PUBLIC_ROOM_ID) {
+        socket.emit('chat message', { message: text }, () => {
+          // ack 回來就代表成功；伺服器會再廣播真正訊息
+        })
+      } else {
+        socket.emit('private chat', { roomId: numericRoomId, message: text, newMessage: true }, () => {
+          // ack 回來；伺服器會廣播到房間 & 單播給對方
+        })
       }
+      setSending(false)
     } catch (e) {
       console.error('❌ 傳送失敗:', e)
       setError('訊息傳送失敗')
