@@ -1,6 +1,6 @@
 // ChatRooms.jsx
 import { useState } from 'react'
-import ChatRoom from '../pages/ChatRoom'
+import ChatRoom from '../pages/Chatroom'
 
 const RoomList = () => {
   const [activeRoomId, setActiveRoomId] = useState(null)
