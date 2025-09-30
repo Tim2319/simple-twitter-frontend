@@ -5,6 +5,7 @@ import axios from 'axios'
 const Home = () => {
   const [posts, setPosts] = useState([])
   const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const token = localStorage.getItem('token')
   const isLoggedIn = !!token
@@ -41,17 +42,26 @@ const Home = () => {
   }
 
   return (
-    <Layout>
+    <>
       {isLoggedIn ? (
-        <form onSubmit={handleSubmit} style={{ marginBottom: '1rem' }}>
+        <form onSubmit={handleSubmit} style={{ marginBottom: '1rem',marginTop:'1rem' }}>
           <textarea
             placeholder="你在想什麼？"
-            style={{ width: '100%', height: '80px' }}
+            style={{ width: '100%', 
+              height: '120px',
+              resize: 'none',
+              padding: 12, 
+              border: '1px solid #ccc', 
+              borderRadius: 15, }}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
           {error && <p style={{ color: 'red' }}>{error}</p>}
-          <button type="submit">發文</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+            <button type="submit" disabled={!description.trim() || submitting}>
+              {submitting ? '送出中…' : '發文'}
+            </button>
+          </div>
         </form>
       ) : (
         <p>請登入才能發文。</p>
@@ -70,7 +80,7 @@ const Home = () => {
         </div>
       ))
     )}
-    </Layout>
+    </>
   )
 }
 
