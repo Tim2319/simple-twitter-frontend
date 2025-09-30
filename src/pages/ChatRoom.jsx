@@ -3,11 +3,14 @@ import { useEffect, useState, useRef } from 'react'
 import { apiHelper } from '../utils/helpers'
 import { getSocket } from '../utils/socket'
 
+// ID for the global/public room (server convention)
 const PUBLIC_ROOM_ID = 1
 
 const ChatRoom = () => {
+  // ----- Routing params -----
   const { roomId } = useParams()
   const numericRoomId = Number(roomId)
+  // ----- UI state -----
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,7 +18,7 @@ const ChatRoom = () => {
   const [error, setError] = useState('')
   const bottomRef = useRef(null)
 
-
+  // ===== 1) Fetch message history when room changes ===== 
   useEffect(() => {
     if (!numericRoomId) return
     let ignore = false
@@ -23,6 +26,8 @@ const ChatRoom = () => {
       try {
         setLoading(true)
         setError('')
+
+        // GET /rooms/:roomId -> { messages: [...] }
         const { data } = await apiHelper.get(`/rooms/${numericRoomId}`)
         const msgs = Array.isArray(data.messages) ? data.messages : []
         if (!ignore) setMessages(msgs)
@@ -38,51 +43,62 @@ const ChatRoom = () => {
     }
 
     fetchMessages()
+
+    // guard against state updates after unmount
     return () => { ignore = true }
   }, [numericRoomId])
 
+  // ===== 2) Wire up Socket.IO listeners for the current room =====
   useEffect(() => {
     if (!numericRoomId) return
     const socket = getSocket()
     if (!socket.connected) socket.connect()
 
-    // 先建立 session（可選）
+    //Initialize session (optional)
     socket.emit('session', [`${numericRoomId}`])
 
-    // 正式加入房間
+    // Join the room officially (server adds this socket to the room)
     socket.emit('join', { username: 'me', roomId: numericRoomId })
 
+    // --- Handlers for different channels of messages ---
+
+    // Public room broadcast: only append when we are in the public room
     const onPublicMsg = (payload) => {
-      // payload 通常是 generateMessage() 結果，可能沒有 roomId，公開房直接收
       if (numericRoomId === PUBLIC_ROOM_ID) {
         setMessages(prev => [...prev, payload])
       }
     }
+
+    // Private room message: payload may or may not include roomId
+    // Fallback to maybeRoomId provided by the server
     const onPrivateMsg = (payload, maybeRoomId) => {
-      // 你的後端 private 事件有時會帶第二個 roomId 參數
       const rId = payload?.roomId ?? maybeRoomId
       if (String(rId) === String(numericRoomId)) {
         setMessages(prev => [...prev, payload])
       }
     }
+
+    // System message (e.g., joins/leaves) for the public room
     const onSystemMsg = (payload) => {
       if (numericRoomId === PUBLIC_ROOM_ID) {
-        setMessages(prev => [...prev, payload]) // 系統訊息也顯示
+        setMessages(prev => [...prev, payload])
       }
     }
+
+    // Realtime user counter (debug/info)
     const onUsersCount = (payload) => {
-      // 可選：把在線人數顯示在標題（這裡只示範印 log）
       console.log('users count', payload.userCount, payload.users)
     }
 
+    // Subscribe
     socket.on('chat message', onPublicMsg)
     socket.on('private chat message', onPrivateMsg)
     socket.on('message', onSystemMsg)
     socket.on('users count', onUsersCount)
 
+    // Cleanup when leaving the room / unmount
     return () => {
-      // 離開房間
-      try { socket.emit('leave', /* userId 可不傳 */ null, numericRoomId) } catch {}
+      try { socket.emit('leave', null, numericRoomId) } catch {}
       socket.off('chat message', onPublicMsg)
       socket.off('private chat message', onPrivateMsg)
       socket.off('message', onSystemMsg)
@@ -90,10 +106,12 @@ const ChatRoom = () => {
     }
   }, [numericRoomId])
 
+  // ===== 3) Send message (public vs private) =====
   const handleSend = async () => {
     const text = input.trim()
     if(!text || !numericRoomId || sending) return
 
+    // Optimistic UI: temp message so the UI feels instant
     const tempId = `temp-${Date.now()}`
     const optimistic = { id: tempId, user: 'me', message: text, roomId: numericRoomId }
     setMessages(prev => [...prev, optimistic])
@@ -103,26 +121,29 @@ const ChatRoom = () => {
     const socket = getSocket()
     try {
       if (numericRoomId === PUBLIC_ROOM_ID) {
+        // Public broadcast; server will ack then broadcast the real message
         socket.emit('chat message', { message: text }, () => {
-          // ack 回來就代表成功；伺服器會再廣播真正訊息
+        // ack received -> success (the server will broadcast the final message)
         })
       } else {
+        // Private room send; server broadcasts to room & unicast to peer
         socket.emit('private chat', { roomId: numericRoomId, message: text, newMessage: true }, () => {
-          // ack 回來；伺服器會廣播到房間 & 單播給對方
+        // ack received
         })
       }
       setSending(false)
     } catch (e) {
+      // Rollback optimistic message on failure
       console.error('❌ 傳送失敗:', e)
       setError('訊息傳送失敗')
       setMessages(prev => prev.filter(m => m.id !== tempId))
-      setInput(text) // 把文字放回輸入框
+      setInput(text)
     } finally {
       setSending(false)
     }
   }
 
-  // Enter 快速送出
+  // ===== 4) Keyboard shortcut: Enter to send (Shift+Enter for newline) =====
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -130,14 +151,14 @@ const ChatRoom = () => {
     }
   }
 
-  // 3) 自動滾到底
+  // ===== 5) Auto scroll to the latest message =====
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-
+  // ===== 6) Render =====
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <h3>聊天室 #{roomId}</h3>
 
       <div style={{ flex: 1, border: '1px solid #ccc', padding: 8, overflowY: 'auto' }}>
@@ -158,9 +179,9 @@ const ChatRoom = () => {
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ display: 'flex', marginTop: 8 }}>
+      <div style={{ display: 'flex', marginTop: 8, }}>
         <input
-          style={{ flex: 1, marginRight: 8 }}
+          style={{ flex: 1, marginRight: 8 ,resize: 'none', minHeight:'50px'}}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={onKeyDown}
