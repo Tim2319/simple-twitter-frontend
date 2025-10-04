@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
 const SideBar = () => {
-  const { currentUser, logout } = useAuth()
+  const { user, isLoggedIn, logout } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -20,13 +20,13 @@ const SideBar = () => {
           <li><Link to="/">首頁</Link></li>
           <li><Link to="/chat">訊息</Link></li>
           <li><Link to="/notification" >通知</Link></li>
-          <li><Link to="/profile">個人資料</Link></li>
+          <li><Link to={`/user/${user.id}`}>個人資料</Link></li>
         </ul>
       </div>
 
       <div style={{ marginTop: 'auto',borderTop: '1px solid #ccc', padding: '1rem' }}>
-        {currentUser ? (
-          <button onClick={handleLogout}>登出 ({currentUser.name})</button>
+        {isLoggedIn  ? (
+          <button onClick={handleLogout}>登出 ({user.name || '使用者'})</button>
         ) : (
           <button onClick={() => navigate('/login')}>登入</button>
         )}
