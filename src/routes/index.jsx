@@ -4,12 +4,15 @@ import Home from '../pages/Home'
 import MessagesLayout from '../components/MessagesLayout'
 import ChatRoom from '../pages/Chatroom'
 import Layout from '../components/Layout'
+import Profile from '../pages/Profile'
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      
       <Route element={<Layout />}>
         <Route index element={<Home />} />
+        <Route path="/user/:id" element={<Profile />} />
       </Route>
       
       {/* Chatroom main route */}
