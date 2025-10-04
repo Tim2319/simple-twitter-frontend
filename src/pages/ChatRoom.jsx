@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useEffect, useState, useRef } from 'react'
 import { apiHelper } from '../utils/helpers'
-import { getSocket } from '../utils/socket'
+import { getSocket } from '../utils/socketHelper'
 
 // ID for the global/public room (server convention)
 const PUBLIC_ROOM_ID = 1

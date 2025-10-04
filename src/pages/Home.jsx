@@ -1,11 +1,10 @@
-import Layout from '../components/Layout'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 
 const Home = () => {
   const [posts, setPosts] = useState([])
   const [description, setDescription] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting] = useState(false)
   const [error, setError] = useState('')
   const token = localStorage.getItem('token')
   const isLoggedIn = !!token
